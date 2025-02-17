@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react-swc";
 
 // Remove the tempo imports and configurations
 export default defineConfig({
-  base: process.env.NODE_ENV === "development" ? "/" : process.env.VITE_BASE_PATH || "/",
+  base: "./",
   optimizeDeps: {
     entries: ["src/main.tsx"],
   },
@@ -19,7 +19,7 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0", // Binding server to all network interfaces
-    port: parseInt(process.env.PORT) || 5173, // Use PORT from environment or default to 5173
+    port: parseInt(process.env.PORT || "5173"), // Use PORT from environment or default to 5173
     allowedHosts: ["tempolabs-tetris-game.onrender.com"]
   }
 });
