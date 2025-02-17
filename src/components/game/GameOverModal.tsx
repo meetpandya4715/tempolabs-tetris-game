@@ -28,14 +28,9 @@ const GameOverModal = ({
         </DialogHeader>
 
         <div className="bg-zinc-950 p-4 rounded-md font-mono text-sm">
-          <div className="text-green-400">
-            {/* Replace >>>> print(final_score) with proper JSX */}
-            {score}
-          </div>
+          <div className="text-green-400">{'>>> print(final_score)'}</div>
           <div className="text-yellow-400 ml-4">{score}</div>
-          <div className="text-green-400">
-            {"Game Over"}
-          </div>
+          <div className="text-green-400">{'>>> game.status'}</div>
           <div className="text-red-400 ml-4">&quot;terminated&quot;</div>
         </div>
 
