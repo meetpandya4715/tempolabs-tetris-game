@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react-swc";
 
 // Remove the tempo imports and configurations
 export default defineConfig({
-  base: "./",
+  base: "",
   optimizeDeps: {
     entries: ["src/main.tsx"],
   },
