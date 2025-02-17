@@ -1,6 +1,6 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Space } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, RotateCcw } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -9,32 +9,45 @@ import {
 } from "@/components/ui/tooltip";
 
 interface ControlsHintProps {
-  controls?: Array<{
+  controls?: {
     key: string;
     action: string;
     icon: React.ReactNode;
-  }>;
+  }[];
 }
 
 const ControlsHint = ({
   controls = [
     {
-      key: "Left",
+      key: "←",
       action: "Move Left",
       icon: <ArrowLeft className="h-4 w-4" />,
     },
     {
-      key: "Right",
+      key: "→",
       action: "Move Right",
       icon: <ArrowRight className="h-4 w-4" />,
     },
-    { key: "Up", action: "Rotate", icon: <ArrowUp className="h-4 w-4" /> },
     {
-      key: "Down",
+      key: "↑",
+      action: "Rotate Clockwise",
+      icon: <RotateCcw className="h-4 w-4" />,
+    },
+    {
+      key: "↓",
       action: "Soft Drop",
       icon: <ArrowDown className="h-4 w-4" />,
     },
-    { key: "Space", action: "Hard Drop", icon: <Space className="h-4 w-4" /> },
+    {
+      key: "Space",
+      action: "Hard Drop",
+      icon: <Space className="h-4 w-4" />,
+    },
+    {
+      key: "P",
+      action: "Pause Game",
+      icon: <span className="text-sm">⏸️</span>,
+    },
   ],
 }: ControlsHintProps) => {
   return (

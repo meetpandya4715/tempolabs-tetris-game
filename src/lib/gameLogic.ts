@@ -1,35 +1,27 @@
-import { Block, GameState, RotationDirection } from "@/types/game";
+import type { Block, GameState } from "@/types/game";
 
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-export const checkCollision = (
-  block: Block,
-  placedBlocks: Block[],
-  moveX: number = 0,
-  moveY: number = 0,
-): boolean => {
-  const newX = block.position.x + moveX;
-  const newY = block.position.y + moveY;
-
-  // Check wall collisions
+export const checkCollision = (block: Block, placedBlocks: Block[]): boolean => {
+  // Check block's cells
   for (let y = 0; y < block.shape.length; y++) {
     for (let x = 0; x < block.shape[y].length; x++) {
       if (block.shape[y][x] === "#") {
-        const boardX = newX + x;
-        const boardY = newY + y;
+        const boardX = block.position.x + x;
+        const boardY = block.position.y + y;
 
-        // Wall and floor collisions
+        // Check board boundaries
         if (
           boardX < 0 ||
           boardX >= BOARD_WIDTH ||
-          boardY >= BOARD_HEIGHT ||
-          boardY < 0
+          boardY < 0 ||
+          boardY >= BOARD_HEIGHT
         ) {
           return true;
         }
 
-        // Check collisions with placed blocks
+        // Check collision with placed blocks
         for (const placedBlock of placedBlocks) {
           for (let py = 0; py < placedBlock.shape.length; py++) {
             for (let px = 0; px < placedBlock.shape[py].length; px++) {
@@ -47,17 +39,16 @@ export const checkCollision = (
       }
     }
   }
-
   return false;
 };
 
-// Create a board representation from placed blocks
-const createBoardGrid = (placedBlocks: Block[]): (string | null)[][] => {
-  const grid = Array(BOARD_HEIGHT)
+export const clearLines = (gameState: GameState): GameState => {
+  const board = Array(BOARD_HEIGHT)
     .fill(null)
     .map(() => Array(BOARD_WIDTH).fill(null));
 
-  placedBlocks.forEach((block) => {
+  // Place all blocks on the board
+  gameState.placedBlocks.forEach((block) => {
     block.shape.forEach((row, y) => {
       row.forEach((cell, x) => {
         if (cell === "#") {
@@ -69,93 +60,69 @@ const createBoardGrid = (placedBlocks: Block[]): (string | null)[][] => {
             boardX >= 0 &&
             boardX < BOARD_WIDTH
           ) {
-            grid[boardY][boardX] = block.color;
+            board[boardY][boardX] = block.color;
           }
         }
       });
     });
   });
 
-  return grid;
-};
-
-// Calculate score based on lines cleared, combo, and time bonus
-const calculateScore = (
-  lines: number,
-  level: number,
-  combo: number,
-  lastClearTime?: number,
-): number => {
-  const linePoints = [40, 100, 300, 1200]; // Base points for 1, 2, 3, or 4 lines
-  const baseScore = linePoints[lines - 1] * level;
-
-  // Combo multiplier: increases with consecutive line clears
-  const comboMultiplier = combo > 1 ? 1 + (combo - 1) * 0.5 : 1;
-
-  // Time bonus: extra points for quick successive clears
-  const now = Date.now();
-  const timeBonus = lastClearTime && now - lastClearTime < 10000 ? 1.5 : 1;
-
-  return Math.floor(baseScore * comboMultiplier * timeBonus);
-};
-
-// Check for completed lines and calculate score
-const clearLines = (gameState: GameState): GameState => {
-  const grid = createBoardGrid(gameState.placedBlocks);
-  const completedLines: number[] = [];
-
   // Find completed lines
-  grid.forEach((row, y) => {
+  const completedLines: number[] = [];
+  board.forEach((row, y) => {
     if (row.every((cell) => cell !== null)) {
       completedLines.push(y);
     }
   });
 
   if (completedLines.length === 0) {
-    // Reset combo if no lines cleared
-    return { ...gameState, combo: 0 };
+    return gameState;
   }
 
-  // Calculate new score and level
+  // Remove completed lines and shift blocks down
+  const newPlacedBlocks = gameState.placedBlocks.flatMap((block) => {
+    const newShape: string[][] = [];
+    let validBlock = false;
+
+    block.shape.forEach((row, y) => {
+      const boardY = block.position.y + y;
+      if (!completedLines.includes(boardY)) {
+        newShape.push(row);
+        if (row.includes("#")) validBlock = true;
+      }
+    });
+
+    if (!validBlock) return [];
+
+    const shiftDown = completedLines.filter(
+      (line) => line > block.position.y
+    ).length;
+
+    return [
+      {
+        ...block,
+        shape: newShape,
+        position: {
+          ...block.position,
+          y: block.position.y + shiftDown,
+        },
+      },
+    ];
+  });
+
+  // Calculate score
+  const newScore =
+    gameState.score + calculateScore(completedLines.length, gameState.level);
   const newLines = gameState.lines + completedLines.length;
   const newLevel = Math.floor(newLines / 10) + 1;
-  const newCombo = gameState.combo + 1;
-
-  const scoreIncrease = calculateScore(
-    completedLines.length,
-    gameState.level,
-    newCombo,
-    gameState.lastClearTime,
-  );
-  const newScore = gameState.score + scoreIncrease;
-
-  // Remove completed lines and shift blocks down
-  let newPlacedBlocks = gameState.placedBlocks.filter((block) => {
-    // Remove blocks that are completely in cleared lines
-    const blockRows = new Set(block.shape.map((_, i) => block.position.y + i));
-    return !Array.from(blockRows).every((row) => completedLines.includes(row));
-  });
-
-  // Shift remaining blocks down
-  completedLines.sort((a, b) => a - b);
-  newPlacedBlocks = newPlacedBlocks.map((block) => {
-    const dropCount = completedLines.filter(
-      (line) => line > block.position.y,
-    ).length;
-    return dropCount > 0
-      ? {
-          ...block,
-          position: { ...block.position, y: block.position.y + dropCount },
-        }
-      : block;
-  });
 
   return {
     ...gameState,
-    score: newScore,
-    level: newLevel,
-    lines: newLines,
     placedBlocks: newPlacedBlocks,
+    score: newScore,
+    lines: newLines,
+    level: newLevel,
+    lastClearTime: Date.now(),
   };
 };
 
@@ -169,7 +136,7 @@ export const hardDrop = (gameState: GameState): GameState => {
         ...gameState.currentBlock,
         position: { ...gameState.currentBlock.position, y: newY + 1 },
       },
-      gameState.placedBlocks,
+      gameState.placedBlocks
     )
   ) {
     newY++;
@@ -184,6 +151,9 @@ export const hardDrop = (gameState: GameState): GameState => {
     },
   ];
 
+  // Check for game over
+  const isGameOver = newY <= 0;
+
   // First update the placed blocks
   const intermediateState = {
     ...gameState,
@@ -191,108 +161,50 @@ export const hardDrop = (gameState: GameState): GameState => {
       ...gameState.nextBlock,
       position: { x: 4, y: 0 },
     },
-    nextBlock: {
-      shape: [["#", "#", "#"]], // This should be randomized in a real implementation
-      color: "#" + Math.floor(Math.random() * 16777215).toString(16),
-    },
+    nextBlock: generateRandomBlock(),
     placedBlocks: newPlacedBlocks,
+    gameOver: isGameOver,
   };
 
   // Then check for and clear any completed lines
-  return clearLines(intermediateState);
+  return isGameOver ? intermediateState : clearLines(intermediateState);
 };
 
 export const getDropInterval = (level: number): number => {
-  // Speed increases with level, base speed is 1000ms, minimum is 100ms
-  return Math.max(1000 - (level - 1) * 100, 100);
+  return Math.max(100, 1000 - (level - 1) * 100); // Decrease interval by 100ms per level, minimum 100ms
 };
 
-export const rotateBlock = (
-  block: Block,
-  direction: RotationDirection,
-): string[][] => {
-  const matrix = block.shape;
-  const N = matrix.length;
-  const M = matrix[0].length;
-  const rotated = Array(M)
-    .fill(null)
-    .map(() => Array(N).fill("."));
-
-  if (direction === "clockwise") {
-    for (let i = 0; i < N; i++) {
-      for (let j = 0; j < M; j++) {
-        rotated[j][N - 1 - i] = matrix[i][j];
-      }
-    }
-  } else {
-    for (let i = 0; i < N; i++) {
-      for (let j = 0; j < M; j++) {
-        rotated[M - 1 - j][i] = matrix[i][j];
-      }
-    }
-  }
-
-  return rotated;
+const calculateScore = (lines: number, level: number): number => {
+  const basePoints = [40, 100, 300, 1200]; // Points for 1, 2, 3, or 4 lines
+  return basePoints[lines - 1] * level;
 };
 
-// Wall kick data for JLSTZ pieces
-const wallKickData = [
-  [
-    [0, 0],
-    [-1, 0],
-    [-1, 1],
-    [0, -2],
-    [-1, -2],
-  ], // 0->R
-  [
-    [0, 0],
-    [1, 0],
-    [1, -1],
-    [0, 2],
-    [1, 2],
-  ], // R->0
-  [
-    [0, 0],
-    [1, 0],
-    [1, -1],
-    [0, 2],
-    [1, 2],
-  ], // R->2
-  [
-    [0, 0],
-    [-1, 0],
-    [-1, 1],
-    [0, -2],
-    [-1, -2],
-  ], // 2->R
+const SHAPES = [
+  {
+    shape: [["#", "#", "#", "#"]], // I
+    color: "#00f0f0",
+  },
+  {
+    shape: [
+      ["#", "#"],
+      ["#", "#"],
+    ], // O
+    color: "#f0f000",
+  },
+  {
+    shape: [
+      ["#", "#", "#"],
+      [" ", "#", " "],
+    ], // T
+    color: "#a000f0",
+  },
+  // Add more shapes as needed
 ];
 
-export const tryRotation = (
-  gameState: GameState,
-  direction: RotationDirection,
-): GameState => {
-  const { currentBlock, placedBlocks } = gameState;
-  const rotatedShape = rotateBlock(currentBlock, direction);
-
-  // Try rotation with wall kicks
-  for (const [offsetX, offsetY] of wallKickData[0]) {
-    const rotatedBlock = {
-      ...currentBlock,
-      shape: rotatedShape,
-      position: {
-        x: currentBlock.position.x + offsetX,
-        y: currentBlock.position.y + offsetY,
-      },
-    };
-
-    if (!checkCollision(rotatedBlock, placedBlocks)) {
-      return {
-        ...gameState,
-        currentBlock: rotatedBlock,
-      };
-    }
-  }
-
-  // If no valid rotation found, return original state
-  return gameState;
+const generateRandomBlock = () => {
+  const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+  return {
+    ...shape,
+    color: shape.color,
+  };
 };
